@@ -1,5 +1,5 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2009-2010 People Power Co.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,10 +8,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -30,55 +32,18 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * @author Jonathan Hui
- * @author Joe Polastre
+/*
+ * @author David Moss
+ * @author Peter A. Bigot <pab@peoplepowerco.com>
  */
-#include <stdio.h>
-#include <stdint.h>
 
-generic module GpioCaptureC() @safe() {
-
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
-
+configuration PlatformPinsC {
+  provides {
+    interface Init;
+  }
 }
 
 implementation {
-
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
-  }
-
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
-
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
+  components PlatformPinsP;
+  Init = PlatformPinsP;
 }

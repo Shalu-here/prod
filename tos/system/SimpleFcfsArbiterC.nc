@@ -89,11 +89,11 @@ generic configuration SimpleFcfsArbiterC(char resourceName[]) {
   uses interface ResourceConfigure[uint8_t id];
 }
 implementation {
-  components MainC;
+  components RealMainP;
   components new FcfsResourceQueueC(uniqueCount(resourceName)) as Queue;
   components new SimpleArbiterP() as Arbiter;
 
-  MainC.SoftwareInit -> Queue;
+  RealMainP.SoftwareInit -> Queue;
 
   Resource = Arbiter;
   ResourceRequested = Arbiter;

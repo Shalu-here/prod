@@ -1,5 +1,5 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2007 Arch Rock Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,10 +8,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -31,54 +33,60 @@
  */
 
 /**
- * @author Jonathan Hui
- * @author Joe Polastre
+ * Not quite generic layer to translate a GIO into a toggle switch
+ * (Newer MSP430 chips require configuring pull-up resistor)
+ *
+ * @author Gilman Tolle <gtolle@archrock.com>
+ * @author Peter A. Bigot <pab@peoplepowerco.com>
  */
-#include <stdio.h>
-#include <stdint.h>
 
-generic module GpioCaptureC() @safe() {
+#include <UserButton.h>
 
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
+generic module SwitchToggleC() {
+  provides interface Get<bool>;
+  provides interface Notify<bool>;
 
+  uses interface HplMsp430GeneralIO;
+  uses interface GpioInterrupt;
 }
-
 implementation {
+  norace bool m_pinHigh;
 
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
-  }
+  task void sendEvent();
 
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
+  command bool Get.get() { return call HplMsp430GeneralIO.get(); }
 
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
+  command error_t Notify.enable() {
+    call HplMsp430GeneralIO.makeInput();
+    call HplMsp430GeneralIO.setResistor(MSP430_PORT_RESISTOR_PULLUP);
+    if ( call HplMsp430GeneralIO.get() ) {
+      m_pinHigh = TRUE;
+      return call GpioInterrupt.enableFallingEdge();
+    } else {
+      m_pinHigh = FALSE;
+      return call GpioInterrupt.enableRisingEdge();
     }
   }
 
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
+  command error_t Notify.disable() {
+    return call GpioInterrupt.disable();
   }
 
+  async event void GpioInterrupt.fired() {
+    call GpioInterrupt.disable();
+
+    m_pinHigh = !m_pinHigh;
+
+    post sendEvent();
+  }
+
+  task void sendEvent() {
+    bool pinHigh;
+    pinHigh = m_pinHigh;
+    signal Notify.notify( pinHigh );
+    if ( pinHigh )
+      call GpioInterrupt.enableFallingEdge();
+    else
+      call GpioInterrupt.enableRisingEdge();
+  }
 }

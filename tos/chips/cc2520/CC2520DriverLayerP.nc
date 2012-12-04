@@ -43,6 +43,10 @@
 #include <TimeSyncMessageLayer.h>
 #include <RadioConfig.h>
 
+#include <stdio.h>
+#include <stdint.h>
+
+
 module CC2520DriverLayerP
 {
   provides{
@@ -215,6 +219,7 @@ implementation{
   //inline void sendDoneSignal(error_t error, bool ack);
 
   tasklet_async event void RadioAlarm.fired(){
+    printf("RadioAlarm.fired()\n");
 
     if( state == STATE_PD_2_IDLE ) {
       state = STATE_IDLE;
@@ -224,8 +229,8 @@ implementation{
     else if( state == STATE_IDLE_2_RX_ON ) {
       state = STATE_RX_ON;
       // in receive mode, enable SFD capture
-      //call SfdCapture.captureRisingEdge(); //JK
-
+      call SfdCapture.captureRisingEdge(); //JK
+printf("call SfdCapture.captureRisingEdge(); - Line 233 (RadioAlarm.fired)\n");
       cmd = CMD_SIGNAL_DONE;
     }else{
       RADIO_ASSERT(FALSE);
@@ -429,12 +434,12 @@ implementation{
 
     return;
   }
-
+/*
   inline void UCTR(uint8_t priority, uint8_t key_addr, uint8_t payload_len, uint8_t nonce_addr, uint16_t start_addr, uint16_t dest_addr){
     CTR(priority, key_addr, payload_len, nonce_addr, start_addr, dest_addr);
     return;
   }
-
+*/
 
   inline void MEMCP(uint8_t priority, uint16_t count, uint16_t start_addr, uint16_t dest_addr){
 
@@ -519,7 +524,6 @@ implementation{
       call SpiByte.write(data[idx]);
 
     call CSN.set();
-
     return status;
 
   }
@@ -660,7 +664,7 @@ implementation{
     call SfdCapture.disable();
     // rising edge just saves timestamp.
     call SfdCapture.captureRisingEdge();
-
+printf("call SfdCapture.captureRisingEdge(); - Line 667 (SoftwareInit)\n");
     // CSN is active low
     call CSN.set();
 
@@ -955,7 +959,7 @@ implementation{
     secMode = 0;
     prevdata9 = 0;
     prevdata10 = 0;
-
+    printf("RadioSend.send()\n");
     if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || radioIrq )
       return EBUSY;
 
@@ -989,17 +993,15 @@ implementation{
     if( call Config.requiresRssiCca(msg) && !call CCA.get() )
       return EBUSY;
 #endif
-
     // there's a chance that there was a receive SFD interrupt in such a
     // short time.
     // TODO: there's still a chance
-
     atomic if (call SFD.get() == 1 || radioIrq)
       return EBUSY;
     else
       // stop receiving
       strobe(CC2520_CMD_SRFOFF);
-
+    
     RADIO_ASSERT( ! radioIrq );
 
     txData = getPayload(msg);
@@ -1104,6 +1106,7 @@ implementation{
       state = STATE_TX_ON;
       //*((volatile uint32_t * )0x40010054) |= (1 << 16);
       call SfdCapture.captureRisingEdge();
+      printf("call SfdCapture.captureRisingEdge(); - Line 1110 (RadioSend)\n");
     }
 
     //#ifdef RADIO_DEBUG_MESSAGES
@@ -1609,7 +1612,7 @@ implementation{
 
   // SFD (rising edge) for timestamps in RX & TX, falling for TX end
   async event void SfdCapture.captured( uint16_t time )  {
-
+printf("SfdCapture.captured()\n");
     //call SfdCapture.disable(); 
     // if canceling the above takes care of the stopping issue, then
     //the state machine is getting stck at some point inthe disable
@@ -1663,10 +1666,12 @@ implementation{
   }
 
   async event void FifoInterrupt.fired(){
+    printf("FifoInterrupt.fired()\n");
   }
 
   // FIFOP interrupt, last byte received
   async event void FifopInterrupt.fired(){
+    printf("FifopInterrupt.fired()\n");
     if(receiving == FALSE){
       atomic receiving = TRUE;
       downloadMessage();
@@ -1688,6 +1693,7 @@ implementation{
           if(sending){
             atomic sending = FALSE;
             call SfdCapture.captureRisingEdge(); // JK release this to enable rx side sfd.
+	    printf("call SfdCapture.captureRisingEdge(); - Line 1695 (serviceRadio)\n");
             // do not signal success if the packet requested for an ack
             // In this case call a timer instead and signal success once the timer expires or an ack is received
             call Leds.led2Toggle();

@@ -1,5 +1,5 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2010-2011 Eric B. Decker
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,10 +8,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -28,57 +30,60 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Warning: many of these routines directly touch cpu registers
+ * it is assumed that this is initilization code and interrupts are
+ * off.
+ *
+ * @author Eric B. Decker
  */
 
-/**
- * @author Jonathan Hui
- * @author Joe Polastre
- */
-#include <stdio.h>
-#include <stdint.h>
+#ifdef notdef
+#include "hardware.h"
+#include "platform_version.h"
 
-generic module GpioCaptureC() @safe() {
+const uint8_t _major = MAJOR;
+const uint8_t _minor = MINOR;
+const uint8_t _build = _BUILD;
 
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
 
+#define BOOT_MAJIK 0x01021910
+noinit uint32_t boot_majik;
+noinit uint16_t boot_count;
+
+#endif
+
+
+module PlatformP {
+  provides interface Init;
+  uses {
+    interface Init as PlatformPins;
+    interface Init as PlatformLeds;
+    interface Init as PlatformClock;
+    interface Init as PeripheralInit;
+  }
 }
 
 implementation {
 
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
+  void uwait(uint16_t u) {
+    uint16_t t0 = TA0R;
+    while((TA0R - t0) <= u);
+  }
+
+  command error_t Init.init() {
+    WDTCTL = WDTPW + WDTHOLD;    // Stop watchdog timer
+
+    call PlatformPins.init();   // Initializes the GIO pins
+    call PlatformLeds.init();   // Initializes the Leds
+    call PlatformClock.init();  // Initializes UCS
+    call PeripheralInit.init();
+
     return SUCCESS;
   }
 
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
+  /***************** Defaults ***************/
+  default command error_t PeripheralInit.init() {
+    return SUCCESS;
   }
-
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
 }

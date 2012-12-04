@@ -1,5 +1,5 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2012 JKU - NTHFS
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,10 +8,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -28,57 +30,54 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author Adam Erdelyi
  */
 
-/**
- * @author Jonathan Hui
- * @author Joe Polastre
- */
-#include <stdio.h>
-#include <stdint.h>
+#ifndef _H_hardware_h
+#define _H_hardware_h
 
-generic module GpioCaptureC() @safe() {
+#include "msp430hardware.h"
 
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
+// enum so components can override power saving,
+// as per TEP 112.
+enum {
+  TOS_SLEEP_NONE = MSP430_POWER_ACTIVE,
+};
 
-}
+/* Use the PlatformAdcC component, and enable 8 pins */
+//#define ADC12_USE_PLATFORM_ADC 1
+//#define ADC12_PIN_AUTO_CONFIGURE 1
+//#define ADC12_PINS_AVAILABLE 8
 
-implementation {
+/* @TODO@ Disable probe for XT1 support until the anomaly observed in
+ * apps/bootstrap/LocalTime is resolved. */
+#ifndef PLATFORM_MSP430_HAS_XT1
+#define PLATFORM_MSP430_HAS_XT1 1
+#endif /* PLATFORM_MSP430_HAS_XT1 */
 
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
-  }
+// LEDs
+TOSH_ASSIGN_PIN(RED_LED, 1, 0);
+TOSH_ASSIGN_PIN(YELLOW_LED, 1, 1);
 
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
+// CC2520 RADIO #defines
+TOSH_ASSIGN_PIN(RADIO_CSN, 3, 0);//OK
+TOSH_ASSIGN_PIN(RADIO_VREF, 1, 7);//OK
+TOSH_ASSIGN_PIN(RADIO_RESET, 1, 2);//OK
+TOSH_ASSIGN_PIN(RADIO_FIFOP, 1, 6);//OK
+TOSH_ASSIGN_PIN(RADIO_SFD, 8, 1);//OK
+TOSH_ASSIGN_PIN(RADIO_GIO0, 1, 4);//OK
+TOSH_ASSIGN_PIN(RADIO_FIFO, 1, 5);//OK
+TOSH_ASSIGN_PIN(RADIO_GIO1, 1, 5);//OK
+TOSH_ASSIGN_PIN(RADIO_CCA, 1, 3);//OK
 
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
+TOSH_ASSIGN_PIN(CC_FIFOP, 1, 6);//OK
+TOSH_ASSIGN_PIN(CC_FIFO, 1, 5);//OK
+TOSH_ASSIGN_PIN(CC_SFD, 8, 1);//OK
+TOSH_ASSIGN_PIN(CC_VREN, 1, 7);//OK
+TOSH_ASSIGN_PIN(CC_RSTN, 1, 2);//OK
 
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
+TOSH_ASSIGN_PIN(UCA0TXD, 3, 4);
+TOSH_ASSIGN_PIN(UCA0RXD, 3, 5);
 
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
-}
+#endif // _H_hardware_h

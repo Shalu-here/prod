@@ -1,6 +1,8 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2009-2010 People Power Company
  * All rights reserved.
+ *
+ * This open source code was developed with funding from People Power Company
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -8,10 +10,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -31,54 +35,35 @@
  */
 
 /**
- * @author Jonathan Hui
- * @author Joe Polastre
+ * @author David Moss
+ * @author Peter A. Bigot <pab@peoplepowerco.com>
  */
-#include <stdio.h>
-#include <stdint.h>
 
-generic module GpioCaptureC() @safe() {
-
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
-
+module PlatformSerialP {
+  provides interface StdControl;
+  uses interface Resource;
 }
 
 implementation {
 
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
+  command error_t StdControl.start(){
+	  	
+/* Platform SMCLK is set to 8MHz (decimal) in hardware/clock/PlatformClockP.nc
+ * but USCI baudrate settings in chips/msp430/x5xxx/usci/msp430usci.h are
+ * based on a 1 MiHz (binary) SMCLK, therefore we need to override USCI UART
+ * configuration. /115200 baud/
+ * SLAU208j.pdf Table 32-4 8MHz 115200: UBR=69, BRS=4, BRF=0
+ */
+msp430_usci_uart_default_config.ctlw0 = (0 << 8) | UCSSEL__SMCLK;
+msp430_usci_uart_default_config.brw = 69;
+msp430_usci_uart_default_config.mctl = UCBRF_0 + UCBRS_4;
+	
+    return call Resource.immediateRequest();
   }
 
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
+  command error_t StdControl.stop(){
+    return call Resource.release();
   }
 
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
+  event void Resource.granted() { }
 }

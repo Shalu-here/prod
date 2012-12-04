@@ -1,5 +1,5 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2007, Vanderbilt University
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,10 +8,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -27,58 +29,35 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
+ * OF THE POSSIBILITY OF SUCH DAMAGE.* All rights reserved.
  */
 
-/**
- * @author Jonathan Hui
- * @author Joe Polastre
+ /**
+ *  Stephen Dawson-Haggerty <stevedh@eecs.berkeley.edu>
+ *  Dummy Extended Address
  */
-#include <stdio.h>
-#include <stdint.h>
 
-generic module GpioCaptureC() @safe() {
+#include "IeeeEui64.h"
 
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
+module LocalIeeeEui64C {
+  provides interface LocalIeeeEui64;
+} implementation {
+  command ieee_eui64_t LocalIeeeEui64.getId() {
+    ieee_eui64_t id;
+    /* this is UCB's OUI */
+    id.data[0] = 0x00;
+    id.data[1] = 0x12;
+    id.data[2] = 0x6d;
 
-}
+    /* UCB will let anyone use this OUI so long as these two octets
+       are 'LO' -- "local".  All other octets are reserved.  */
+    /* SDH -- 9/10/2010 */
+    id.data[3] = 'L';
+    id.data[4] = 'O';
 
-implementation {
-
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
+    id.data[5] = 0;
+    id.data[6] = TOS_NODE_ID >> 8;
+    id.data[7] = TOS_NODE_ID & 0xff;
+    return id;
   }
-
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
-
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
 }

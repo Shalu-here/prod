@@ -1,6 +1,8 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2010 People Power Co.
  * All rights reserved.
+ *
+ * This open source code was developed with funding from People Power Company
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -8,10 +10,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -30,55 +34,42 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * @author Jonathan Hui
- * @author Joe Polastre
- */
-#include <stdio.h>
-#include <stdint.h>
+configuration PlatformAdcC {
+  provides {
+    interface HplMsp430GeneralIO as A0;
+    interface HplMsp430GeneralIO as A1;
+    interface HplMsp430GeneralIO as A2;
+    interface HplMsp430GeneralIO as A3;
+    interface HplMsp430GeneralIO as A4;
+    interface HplMsp430GeneralIO as A5;
+    interface HplMsp430GeneralIO as A6;
+    interface HplMsp430GeneralIO as A7;
 
-generic module GpioCaptureC() @safe() {
-
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
-
+    interface Msp430Timer as TimerA;
+    interface Msp430TimerControl as ControlA0;
+    interface Msp430TimerControl as ControlA1;
+    interface Msp430Compare as CompareA0;
+    interface Msp430Compare as CompareA1;
+  }
 }
 
 implementation {
 
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
-  }
+  components HplMsp430GeneralIOC;
+  A0 = HplMsp430GeneralIOC.Port20;
+  A1 = HplMsp430GeneralIOC.Port21;
+  A2 = HplMsp430GeneralIOC.Port22;
+  A3 = HplMsp430GeneralIOC.Port23;
+  A4 = HplMsp430GeneralIOC.Port24;
+  A5 = HplMsp430GeneralIOC.Port25;
+  A6 = HplMsp430GeneralIOC.Port26;
+  A7 = HplMsp430GeneralIOC.Port27;
 
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
-
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
+  components Msp430TimerC;
+  TimerA = Msp430TimerC.Timer0_A;
+  ControlA0 = Msp430TimerC.Control0_A0;
+  ControlA1 = Msp430TimerC.Control0_A1;
+  CompareA0 = Msp430TimerC.Compare0_A0;
+  CompareA1 = Msp430TimerC.Compare0_A1;
 
 }

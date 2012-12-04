@@ -1,5 +1,7 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2011, Eric B. Decker
+ * Copyright (c) 2010, People Power Co.
+ * Copyright (c) 2000-2003 The Regents of the University of California.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,10 +10,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -31,54 +35,21 @@
  */
 
 /**
- * @author Jonathan Hui
- * @author Joe Polastre
+ * Msp430CounterMicroC provides the standard 1 MiHz counter for the MSP430.
+ *
+ * @author Adam Erdelyi <a.erdelyi@nthfs.jku.at>
+ *
+ * We assign T1A to the 32KiHz timer and T0A to the
+ * 1 MiHz (TMicro) timer (see Msp430CounterMicro).
  */
-#include <stdio.h>
-#include <stdint.h>
 
-generic module GpioCaptureC() @safe() {
-
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
-
+configuration Msp430CounterMicroC {
+  provides interface Counter<TMicro,uint16_t> as Msp430CounterMicro;
 }
-
 implementation {
+  components Msp430TimerC,
+    new Msp430CounterC(TMicro) as Counter;
 
-  error_t enableCapture( uint8_t mode ) {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
-    }
-    return SUCCESS;
-  }
-
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
-
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
+  Msp430CounterMicro = Counter;
+  Counter.Msp430Timer -> Msp430TimerC.Timer0_A;
 }

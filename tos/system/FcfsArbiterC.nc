@@ -66,11 +66,11 @@ generic configuration FcfsArbiterC(char resourceName[]) {
   }
 }
 implementation {
-  components MainC;
+  components RealMainP;
   components new FcfsResourceQueueC(uniqueCount(resourceName)) as Queue;
   components new ArbiterP(uniqueCount(resourceName)) as Arbiter;
 
-  MainC.SoftwareInit -> Queue;
+  RealMainP.SoftwareInit -> Queue;
 
   Resource = Arbiter;
   ResourceRequested = Arbiter;

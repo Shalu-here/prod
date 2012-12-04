@@ -151,4 +151,6 @@ implementation
 
   components CC2520SecurityP;
   DriverLayerP.CC2520Security -> CC2520SecurityP;
+//for printf  
+  components SerialPrintfC;
 }

@@ -1,6 +1,8 @@
-
-/* Copyright (c) 2000-2003 The Regents of the University of California.
+/*
+ * Copyright (c) 2009-2010 People Power Company
  * All rights reserved.
+ *
+ * This open source code was developed with funding from People Power Company
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -8,10 +10,12 @@
  *
  * - Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
+ *
  * - Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the
  *   distribution.
+ *
  * - Neither the name of the copyright holders nor the names of
  *   its contributors may be used to endorse or promote products derived
  *   from this software without specific prior written permission.
@@ -31,54 +35,33 @@
  */
 
 /**
- * @author Jonathan Hui
- * @author Joe Polastre
+ * @author David Moss
+ * @author Peter A. Bigot <pab@peoplepowerco.com>
  */
-#include <stdio.h>
-#include <stdint.h>
 
-generic module GpioCaptureC() @safe() {
-
-  provides interface GpioCapture as Capture;
-  uses interface Msp430TimerControl;
-  uses interface Msp430Capture;
-  uses interface HplMsp430GeneralIO as GeneralIO;
-
+module PlatformPinsP {
+  provides interface Init;
 }
 
 implementation {
+  int i;
 
-  error_t enableCapture( uint8_t mode ) {
+  command error_t Init.init() {
     atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectModuleFunc();
-      call Msp430TimerControl.clearPendingInterrupt();
-      call Msp430Capture.clearOverflow();
-      call Msp430TimerControl.setControlAsCapture( mode );
-      call Msp430TimerControl.enableEvents();
+      /*
+       * for now, just leave it all as the reset state.
+       *
+       * 5438, all input, with OUT/IN left alone.
+       */
+
+#if 0 /* Disabled: these specific setting sare defaults, but others might not be */
+      PMAPPWD = PMAPPW;                         // Get write-access to port mapping regs
+      P1MAP5 = PM_UCA0RXD;                      // Map UCA0RXD output to P1.5
+      P1MAP6 = PM_UCA0TXD;                      // Map UCA0TXD output to P1.6
+      PMAPPWD = 0;                              // Lock port mapping registers
+#endif //
+
     }
     return SUCCESS;
   }
-
-  async command error_t Capture.captureRisingEdge() {
-    return enableCapture( MSP430TIMER_CM_RISING );
-  }
-
-  async command error_t Capture.captureFallingEdge() {
-    return enableCapture( MSP430TIMER_CM_FALLING );
-  }
-
-  async command void Capture.disable() {
-    atomic {
-      call Msp430TimerControl.disableEvents();
-      call GeneralIO.selectIOFunc();
-    }
-  }
-
-  async event void Msp430Capture.captured( uint16_t time ) {
-    call Msp430TimerControl.clearPendingInterrupt();
-    call Msp430Capture.clearOverflow();
-    signal Capture.captured( time );
-  }
-
 }
